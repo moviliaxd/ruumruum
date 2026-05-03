@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, Expense, uploadFile } from '@/lib/supabase';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/src/lib/AuthContext';
 
 export function useExpenses(tripId?: string) {
   const { profile } = useAuth();

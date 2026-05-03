@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, Trip } from '@/lib/supabase';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/src/lib/AuthContext';
 
 export function useTrips() {
   const { profile } = useAuth();

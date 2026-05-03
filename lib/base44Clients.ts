@@ -5,23 +5,11 @@
  * Obtén los valores desde el panel de Base44 → Settings → API.
  */
 
-import { createClient } from '@base44/sdk';
+// Este archivo ya no se usa en la aplicación actual.
+// Se deja como placeholder para evitar errores de compilación al incluir todos los archivos TypeScript.
 
-// ── App Clientes (bookings) ──────────────────────────────────
-export const clientesApp = createClient({
-  appId:        process.env.NEXT_PUBLIC_BASE44_CLIENTES_APP_ID   ?? '',
-  token:        process.env.NEXT_PUBLIC_BASE44_CLIENTES_TOKEN    ?? '',
-  requiresAuth: false,
-  appBaseUrl:   process.env.NEXT_PUBLIC_BASE44_CLIENTES_URL      ?? '',
-});
-
-// ── App Conductores (trips, documents, expenses) ─────────────
-export const conductoresApp = createClient({
-  appId:        process.env.NEXT_PUBLIC_BASE44_CONDUCTORES_APP_ID ?? '',
-  token:        process.env.NEXT_PUBLIC_BASE44_CONDUCTORES_TOKEN  ?? '',
-  requiresAuth: false,
-  appBaseUrl:   process.env.NEXT_PUBLIC_BASE44_CONDUCTORES_URL    ?? '',
-});
+export const clientesApp = null as unknown;
+export const conductoresApp = null as unknown;
 
 /**
  * Uso en Dashboard.tsx:
