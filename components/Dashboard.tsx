@@ -2,14 +2,101 @@
 
 /**
  * Dashboard Maestro — Ruum Ruum
- * Migrado a Supabase
+ * Conectado directamente a Base44 (app conductores: ruum-drive-pro)
+ *
+ * Entidades: Trip, DriverDocument, Expense, Message, SupportMessage, User
+ * Base URL: https://ruum-drive-pro.base44.app/api
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, Trip, Expense, DriverDocument, Message, SupportMessage, Profile } from '@/lib/supabase';
+import { createClient } from '@base44/sdk';
 
-// ── Tipos locales ──────────────────────────────────────────────
-type TripStatus = Trip['status'];
+// ── Cliente Base44 ─────────────────────────────────────────────
+const base44 = createClient({
+  appId: '69edfb70ed3a9759c65ec1d0',
+  headers: { api_key: '370410fd693f41b2a97487e2d03730d8' },
+});
+
+// ── Tipos ──────────────────────────────────────────────────────
+type TripStatus = 'requested'|'accepted'|'in_progress'|'pickup_arrived'|'vehicle_picked'|'delivering'|'completed'|'cancelled';
+type TripType   = 'local'|'foraneo'|'nocturno'|'empresarial'|'personal';
+
+interface Trip {
+  id: string;
+  status: TripStatus;
+  payment_status?: 'pending'|'paid'|'revoked';
+  pickup_location: string;
+  dropoff_location: string;
+  vehicle_brand?: string;
+  vehicle_model?: string;
+  vehicle_color?: string;
+  vehicle_plates?: string;
+  vehicle_type?: string;
+  trip_date: string;
+  trip_time?: string;
+  trip_type?: TripType;
+  distance_km?: number;
+  earnings?: number;
+  expenses?: number;
+  commission_pct?: number;
+  client_name?: string;
+  client_phone?: string;
+  notes?: string;
+  driver_email?: string;
+  created_date: string;
+}
+
+interface DriverDocument {
+  id: string;
+  document_type: 'licencia_conducir'|'comprobante_domicilio'|'constancia_fiscal'|'otro';
+  document_name: string;
+  status?: 'pending'|'approved'|'rejected';
+  driver_email?: string;
+  expiry_date?: string;
+  file_url?: string;
+  created_date: string;
+}
+
+interface Expense {
+  id: string;
+  category: 'caseta'|'gasolina'|'lavado'|'estacionamiento'|'otro';
+  amount: number;
+  driver_email?: string;
+  trip_id?: string;
+  description?: string;
+  expense_date?: string;
+  deductible?: boolean;
+  created_date: string;
+}
+
+interface Message {
+  id: string;
+  title: string;
+  body: string;
+  read?: boolean;
+  driver_email?: string;
+  message_type?: 'info'|'alert'|'payment'|'trip';
+  created_date: string;
+}
+
+interface SupportMessage {
+  id: string;
+  role: 'driver'|'admin';
+  content: string;
+  read?: boolean;
+  ticket_id?: string;
+  urgency?: 'normal'|'urgent';
+  driver_email?: string;
+  created_date: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin'|'user';
+  created_date: string;
+}
 
 // ── Config de estados ──────────────────────────────────────────
 const TRIP_STATUS: Record<TripStatus, { label: string; dot: string; bg: string; text: string }> = {
@@ -64,7 +151,7 @@ export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [support, setSupport]   = useState<SupportMessage[]>([]);
-  const [users, setUsers]       = useState<Profile[]>([]);
+  const [users, setUsers]       = useState<User[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [tab, setTab]           = useState<'overview'|'trips'|'drivers'|'finances'|'support'>('overview');
@@ -81,38 +168,33 @@ export default function Dashboard() {
     setLoading(true); setError(null);
     try {
       const [t, d, e, m, s, u] = await Promise.all([
-        supabase.from('trips').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('driver_documents').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('support_messages').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('profiles').select('*').limit(100),
+        base44.entities.Trip.list({ sort_by: '-created_date', limit: 100 }),
+        base44.entities.DriverDocument.list({ sort_by: '-created_date', limit: 200 }),
+        base44.entities.Expense.list({ sort_by: '-created_date', limit: 200 }),
+        base44.entities.Message.list({ sort_by: '-created_date', limit: 50 }),
+        base44.entities.SupportMessage.list({ sort_by: '-created_date', limit: 50 }),
+        base44.entities.User.list({ limit: 100 }),
       ]);
-      if (t.error) throw t.error;
-      if (d.error) throw d.error;
-      if (e.error) throw e.error;
-      if (m.error) throw m.error;
-      if (s.error) throw s.error;
-      if (u.error) throw u.error;
-      setTrips(t.data as Trip[]);
-      setDocs(d.data as DriverDocument[]);
-      setExpenses(e.data as Expense[]);
-      setMessages(m.data as Message[]);
-      setSupport(s.data as SupportMessage[]);
-      setUsers(u.data as Profile[]);
+      setTrips(t as Trip[]);
+      setDocs(d as DriverDocument[]);
+      setExpenses(e as Expense[]);
+      setMessages(m as Message[]);
+      setSupport(s as SupportMessage[]);
+      setUsers(u as User[]);
       setLastUpdated(new Date());
     } catch (err) {
-      setError('Error al conectar con Supabase. Verifica tu configuración.');
+      setError('Error al conectar con Base44. Verifica tu API key.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { loadData(); }, [loadData]);
 
   // ── Métricas ─────────────────────────────────────────────────
   const active      = trips.filter(t => ['in_progress','pickup_arrived','vehicle_picked','delivering'].includes(t.status));
+  const pending     = trips.filter(t => ['requested','accepted'].includes(t.status));
   const completed   = trips.filter(t => t.status === 'completed');
   const totalEarnings = trips.filter(t => t.status === 'completed').reduce((s, t) => s + (t.earnings ?? 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
@@ -130,7 +212,7 @@ export default function Dashboard() {
   // Conductores únicos desde trips + users
   const driverEmails = [...new Set([
     ...trips.filter(t => t.driver_email).map(t => t.driver_email!),
-    ...users.filter(u => u.role === 'conductor').map(u => u.email),
+    ...users.filter(u => u.role === 'user').map(u => u.email),
   ])];
 
   const filteredTrips = tripFilter === 'all' ? trips : trips.filter(t => t.status === tripFilter);
@@ -139,7 +221,7 @@ export default function Dashboard() {
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#F8F8F5', flexDirection:'column', gap:16 }}>
       <div style={{ width:48, height:48, background:'#FFC400', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, fontSize:18, color:'#151515' }}>RR</div>
-      <div style={{ fontSize:14, color:'#6b7280' }}>Conectando con Supabase…</div>
+      <div style={{ fontSize:14, color:'#6b7280' }}>Conectando con Base44…</div>
     </div>
   );
 
@@ -240,7 +322,7 @@ export default function Dashboard() {
                       <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
                         {t.pickup_location?.split(',')[0]} → {t.dropoff_location?.split(',')[0]}
                         {t.driver_email && ` · ${t.driver_email.split('@')[0]}`}
-                        {t.created_at && ` · ${reltime(t.created_at)}`}
+                        {t.created_date && ` · ${reltime(t.created_date)}`}
                       </div>
                     </div>
                     {t.earnings && <div style={{ fontSize:12, color:'#16a34a', marginLeft:'auto', whiteSpace:'nowrap' }}>{MXN(t.earnings)}</div>}
@@ -295,7 +377,7 @@ export default function Dashboard() {
           <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Conductores registrados</div>
           {driverEmails.length === 0 && (
             <div style={{ padding:32, textAlign:'center', color:'#9ca3af', fontSize:13, background:'#fff', borderRadius:12 }}>
-              Sin conductores
+              Sin conductores en Base44
             </div>
           )}
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -445,11 +527,11 @@ export default function Dashboard() {
                     {s.ticket_id && <span style={{ fontSize:10, color:'#9ca3af' }}>#{s.ticket_id}</span>}
                   </div>
                   <div style={{ fontSize:13, color:'#374151', lineHeight:1.5 }}>{s.content}</div>
-                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:6 }}>{reltime(s.created_at)}</div>
+                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:6 }}>{reltime(s.created_date)}</div>
                 </div>
                 <button
                   onClick={async () => {
-                    await supabase.from('support_messages').update({ read: true }).eq('id', s.id);
+                    await base44.entities.SupportMessage.update(s.id, { read: true });
                     setSupport(prev => prev.map(m => m.id === s.id ? { ...m, read: true } : m));
                   }}
                   style={{ fontSize:11, padding:'4px 10px', border:'0.5px solid rgba(0,0,0,0.15)', borderRadius:4, background:'#fff', cursor:'pointer', flexShrink:0 }}
@@ -470,7 +552,7 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontSize:12, fontWeight:600, color:'#111' }}>{m.title}</div>
                     <div style={{ fontSize:12, color:'#6b7280', marginTop:3 }}>{m.body}</div>
-                    <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>{m.driver_email} · {reltime(m.created_at)}</div>
+                    <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>{m.driver_email} · {reltime(m.created_date)}</div>
                   </div>
                 </div>
               ))}

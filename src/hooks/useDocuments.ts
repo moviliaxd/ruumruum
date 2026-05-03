@@ -1,29 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase, DriverDocument, uploadFile } from '@/lib/supabase';
-import { useAuth } from '@/src/lib/AuthContext';
+import { useAuth } from '@/lib/AuthContext';
 
 export function useDocuments() {
   const { profile } = useAuth();
   const [documents, setDocuments] = useState<DriverDocument[]>([]);
   const [loading, setLoading]     = useState(true);
 
-  useEffect(() => {
-    if (!profile) return;
-    const fetch = async () => {
-      setLoading(true);
-      const { data } = await supabase
-        .from('driver_documents')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setDocuments((data ?? []) as DriverDocument[]);
-      setLoading(false);
-    };
-    fetch();
-  }, [profile]);
-
-  const refetch = async () => {
+  const fetchDocuments = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('driver_documents')
@@ -31,7 +17,9 @@ export function useDocuments() {
       .order('created_at', { ascending: false });
     setDocuments((data ?? []) as DriverDocument[]);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => { if (profile) fetchDocuments(); }, [profile, fetchDocuments]);
 
   const uploadDocument = async (
     file: File,
@@ -45,8 +33,8 @@ export function useDocuments() {
       expiry_date, driver_email: profile?.email, status: 'pending',
     });
     if (error) throw new Error(error.message);
-    await refetch();
+    await fetchDocuments();
   };
 
-  return { documents, loading, uploadDocument, refetch };
+  return { documents, loading, uploadDocument, refetch: fetchDocuments };
 }

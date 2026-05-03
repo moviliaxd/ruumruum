@@ -266,8 +266,8 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 text-center">
           <span className="text-[#FFC400] font-bold text-xs tracking-widest uppercase mb-12 block" style={{fontFamily:'Montserrat,sans-serif'}}>Manifiesto</span>
           <blockquote className="font-bold text-3xl md:text-4xl xl:text-5xl text-white leading-tight max-w-4xl mx-auto mb-16" style={{fontFamily:'Montserrat,sans-serif'}}>
-            &ldquo;Cuando alguien entrega sus llaves, no entrega solo un vehículo.{' '}
-            <span className="text-[#FFC400]">Entrega tranquilidad.&rdquo;</span>
+            "Cuando alguien entrega sus llaves, no entrega solo un vehículo.{' '}
+            <span className="text-[#FFC400]">Entrega tranquilidad.</span>"
           </blockquote>
           <div className="flex flex-wrap justify-center gap-3">
             {[

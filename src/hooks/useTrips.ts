@@ -5,9 +5,9 @@
  * Con tiempo real: conductor ve viajes nuevos al instante
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase, Trip } from '@/lib/supabase';
-import { useAuth } from '@/src/lib/AuthContext';
+import { useAuth } from '@/lib/AuthContext';
 
 export function useTrips() {
   const { profile } = useAuth();
@@ -15,7 +15,7 @@ export function useTrips() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
-  const fetchTrips = async () => {
+  const fetchTrips = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('trips')
@@ -25,11 +25,10 @@ export function useTrips() {
     if (error) setError(error.message);
     else setTrips(data as Trip[]);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
-
     fetchTrips();
 
     // Tiempo real — cualquier cambio en trips se refleja al instante
@@ -49,7 +48,7 @@ export function useTrips() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [profile]);
+  }, [profile, fetchTrips]);
 
   const updateTripStatus = async (tripId: string, status: Trip['status'], extra?: Partial<Trip>) => {
     const { error } = await supabase

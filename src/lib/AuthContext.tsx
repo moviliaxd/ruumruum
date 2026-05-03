@@ -1,8 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
 import { supabase, Profile } from '@/lib/supabase';
 
 interface AuthContextType {
@@ -19,7 +18,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [user, setUser]       = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -34,11 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as Profile | null;
   };
 
-  const redirectByRole = useCallback((role: string) => {
-    if (role === 'admin')          router.push('/admin');
-    else if (role === 'conductor') router.push('/conductor');
-    else                           router.push('/cliente');
-  }, [router]);
+  const redirectByRole = (role: string) => {
+    if (role === 'admin')          window.location.href = '/admin';
+    else if (role === 'conductor') window.location.href = '/conductor';
+    else                           window.location.href = '/cliente';
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -59,8 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const p = await fetchProfile(session.user.id);
           setProfile(p);
           if (event === 'SIGNED_IN') {
-            console.log('ROL DEL USUARIO:', p?.role);
-            setTimeout(() => redirectByRole(p?.role ?? 'cliente'), 1000);
+            setTimeout(() => redirectByRole(p?.role ?? 'cliente'), 300);
           }
         } else {
           setProfile(null);
@@ -70,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, [redirectByRole]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -95,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    router.push('/');
+    window.location.href = '/';
   };
 
   const updateProfile = async (data: Partial<Profile>) => {
