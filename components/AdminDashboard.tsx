@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { Trip, Expense, DriverDocument, Message, Profile } from '@/lib/supabase';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,58 +10,6 @@ const supabase = createClient(
 );
 
 // ── Tipos ──────────────────────────────────────────────────────────────
-interface Trip {
-  id: string;
-  status: string;
-  payment_status?: string;
-  pickup_location: string;
-  dropoff_location: string;
-  vehicle_brand?: string;
-  vehicle_model?: string;
-  vehicle_plates?: string;
-  trip_type?: string;
-  trip_date: string;
-  trip_time?: string;
-  earnings?: number;
-  driver_email?: string;
-  client_name?: string;
-  client_phone?: string;
-  notes?: string;
-  created_at: string;
-}
-
-interface Expense {
-  id: string;
-  trip_id?: string;
-  driver_email?: string;
-  category: string;
-  amount: number;
-  description?: string;
-  deductible?: boolean;
-  expense_date?: string;
-  created_at: string;
-}
-
-interface DriverDocument {
-  id: string;
-  driver_email?: string;
-  document_type: string;
-  document_name: string;
-  status: string;
-  expiry_date?: string;
-  created_at: string;
-}
-
-interface Message {
-  id: string;
-  title: string;
-  body: string;
-  read: boolean;
-  driver_email?: string;
-  message_type?: string;
-  created_at: string;
-}
-
 interface SupportMessage {
   id: string;
   driver_email?: string;
@@ -69,16 +18,6 @@ interface SupportMessage {
   read: boolean;
   ticket_id?: string;
   urgency?: string;
-  created_at: string;
-}
-
-interface Profile {
-  id: string;
-  email: string;
-  full_name?: string;
-  phone?: string;
-  role: string;
-  onboarding_completed?: boolean;
   created_at: string;
 }
 
