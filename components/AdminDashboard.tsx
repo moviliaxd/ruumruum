@@ -116,12 +116,13 @@ function timeAgo(iso: string) {
   return `hace ${Math.floor(s / 86400)}d`;
 }
 
-type Section = 'dashboard' | 'viajes' | 'usuarios' | 'conductores' | 'evidencia' |
+type Section = 'dashboard' | 'soporte' | 'viajes' | 'usuarios' | 'conductores' | 'evidencia' |
                'incidencias' | 'pagos' | 'documentos' | 'tarifas' | 'empresas' |
                'reportes' | 'configuracion';
 
 const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'dashboard',     label: 'Dashboard',      icon: '▦' },
+  { id: 'soporte',       label: 'Soporte',         icon: '☎' },
   { id: 'viajes',        label: 'Viajes',          icon: '⌁' },
   { id: 'usuarios',      label: 'Usuarios',        icon: '◉' },
   { id: 'conductores',   label: 'Conductores',     icon: '◆' },
@@ -133,6 +134,14 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'empresas',      label: 'Empresas',        icon: '▤' },
   { id: 'reportes',      label: 'Reportes',        icon: '⌬' },
   { id: 'configuracion', label: 'Configuración',   icon: '⚙' },
+];
+
+// Estados operativos del viaje
+const TRIP_STATES = [
+  'Solicitado','Asignado','Aceptado por conductor','En camino a origen',
+  'En punto de origen','Evidencia inicial','Viaje iniciado','En tránsito',
+  'Pausado / detenido','Incidencia reportada','En punto de destino',
+  'Evidencia final','Entregado','En revisión','Cerrado','Cancelado','Viaje fallido',
 ];
 
 // ── Sub-componentes pequeños ───────────────────────────────────────────
@@ -155,6 +164,10 @@ export default function AdminDashboard() {
   const [modalOpen, setModalOpen]   = useState(false);
   const [toast, setToast]     = useState({ msg: '', show: false });
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [selectedSupportTrip, setSelectedSupportTrip] = useState<Trip | null>(null);
+  const [incidentModalOpen, setIncidentModalOpen] = useState(false);
+  const [closureChecks, setClosureChecks] = useState([true, false, true, false, true, false]);
+  const [newIncident, setNewIncident] = useState({ trip_ref: "", origin: "conductor", type: "retraso", priority: "media", responsible: "Soporte operativo", status: "nueva", notes: "" });
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -556,6 +569,248 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+
+              {/* ── SOPORTE ─────────────────────────────────────────── */}
+              <div className={`section ${section === 'soporte' ? 'active' : ''}`}>
+                <div className="command-strip" style={{background:'linear-gradient(120deg,rgba(23,23,23,.96),rgba(29,78,216,.22))'}}>
+                  <div>
+                    <span className="eyebrow">Soporte Ruum Ruum</span>
+                    <h2>Operación supervisada con trazabilidad completa.</h2>
+                  </div>
+                  <div className="q-actions">
+                    <button className="btn btn-yellow btn-sm" onClick={() => setIncidentModalOpen(true)}>Crear incidencia</button>
+                    <button className="btn btn-yellow btn-sm" onClick={() => showToast('Chat interno — próximamente')}>Abrir chat interno</button>
+                    <button className="btn btn-yellow btn-sm" onClick={() => showToast('Solo se cierran viajes con checklist completo')}>Cerrar viaje elegible</button>
+                  </div>
+                </div>
+
+                {/* KPIs soporte */}
+                <div className="metric-grid">
+                  <article className="metric-card mc-yellow"><span>Viajes activos</span><strong>{active.length}</strong><small>{active.filter(t=>t.trip_type==='foraneo').length} foráneos</small></article>
+                  <article className="metric-card"><span>Programados</span><strong>{trips.filter(t=>t.status==='accepted').length}</strong><small>próximos</small></article>
+                  <article className="metric-card mc-red"><span>Con alerta</span><strong>{incidencias.length}</strong><small>{incidencias.filter(s=>s.urgency==='urgent').length} críticos</small></article>
+                  <article className="metric-card mc-yellow"><span>Por revisar</span><strong>{docsRevision.length + pagPendiente.length}</strong><small>evidencia y gastos</small></article>
+                  <article className="metric-card mc-green"><span>Conductores disp.</span><strong>{conductores.length}</strong><small>{active.length} en viaje</small></article>
+                  <article className="metric-card"><span>Mensajes</span><strong>{messages.filter(m=>!m.read).length + support.filter(s=>!s.read).length}</strong><small>sin leer</small></article>
+                  <article className="metric-card mc-red"><span>Incidencias abiertas</span><strong>{incidencias.length}</strong><small>{support.filter(s=>!s.read).length} sin atender</small></article>
+                  <article className="metric-card mc-yellow"><span>Msj. pendientes</span><strong>{support.filter(s=>!s.read).length}</strong><small>conductor e interno</small></article>
+                </div>
+
+                {/* Monitoreo + ficha de caso */}
+                <div className="dash-grid">
+                  <div className="panel">
+                    <div className="block-head">
+                      <div><h2>Monitoreo de viajes</h2><p className="text-muted">Vista operativa con evidencia, checklist, gastos e historial.</p></div>
+                      <span className="pill pill-live">● Centro de control</span>
+                    </div>
+                    <div className="dtable" style={{overflowX:'auto'}}>
+                      <div className="drow dhead" style={{gridTemplateColumns:'60px 90px 90px 80px minmax(110px,1fr) 76px 120px 55px',minWidth:680}}>
+                        <span>ID</span><span>Cliente</span><span>Conductor</span><span>Vehículo</span><span>Ruta</span><span>Fecha</span><span>Estatus</span><span>Soporte</span>
+                      </div>
+                      {trips.slice(0,8).map(t => (
+                        <div key={t.id} className="drow" style={{gridTemplateColumns:'60px 90px 90px 80px minmax(110px,1fr) 76px 120px 55px',minWidth:680}}>
+                          <span style={{fontSize:10}}>{t.id.slice(0,6)}…</span>
+                          <span>{t.client_name?.slice(0,12) ?? '—'}</span>
+                          <span>{t.driver_email?.split('@')[0]?.slice(0,10) ?? 'Sin asignar'}</span>
+                          <span>{[t.vehicle_brand,t.vehicle_model].filter(Boolean).join(' ').slice(0,12) || '—'}</span>
+                          <span style={{fontSize:11}}>{t.pickup_location?.slice(0,16)} → {t.dropoff_location?.slice(0,14)}</span>
+                          <span style={{fontSize:11}}>{t.trip_date}</span>
+                          <Pill status={t.status} />
+                          <button onClick={() => { setSelectedSupportTrip(t); showToast(`Caso ${t.id.slice(0,8)}`); }}>Abrir</button>
+                        </div>
+                      ))}
+                      {trips.length === 0 && (
+                        <div className="drow" style={{gridTemplateColumns:'1fr',minWidth:0}}>
+                          <span className="text-muted">Sin viajes registrados</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ficha de caso */}
+                  <div className="panel">
+                    {selectedSupportTrip ? (
+                      <>
+                        <div className="block-head">
+                          <div><h2>Caso {selectedSupportTrip.id.slice(0,8)}</h2><p className="text-muted">Ficha de soporte y control de cierre.</p></div>
+                          <Pill status={selectedSupportTrip.status} />
+                        </div>
+                        <div className="detail-grid">
+                          <div><span>Cliente</span><strong>{selectedSupportTrip.client_name ?? '—'}</strong></div>
+                          <div><span>Conductor</span><strong>{selectedSupportTrip.driver_email?.split('@')[0] ?? '—'}</strong></div>
+                          <div><span>Vehículo</span><strong>{[selectedSupportTrip.vehicle_brand,selectedSupportTrip.vehicle_model].filter(Boolean).join(' ') || '—'}</strong></div>
+                          <div><span>Fecha/hora</span><strong>{selectedSupportTrip.trip_date} {selectedSupportTrip.trip_time ?? ''}</strong></div>
+                          <div><span>Origen</span><strong>{selectedSupportTrip.pickup_location}</strong></div>
+                          <div><span>Destino</span><strong>{selectedSupportTrip.dropoff_location}</strong></div>
+                        </div>
+                        <h3 style={{fontSize:12,fontWeight:800,marginBottom:8}}>Estados operativos</h3>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:12}}>
+                          {TRIP_STATES.map(s => (
+                            <span key={s} style={{border:'1px solid var(--line)',borderRadius:999,background:'#fbfbf9',padding:'3px 8px',fontSize:10,fontWeight:700}}>{s}</span>
+                          ))}
+                        </div>
+                        <div className="action-grid">
+                          <button className="btn btn-black btn-sm" onClick={() => setSection('viajes')}>Ver viaje completo</button>
+                          <button className="btn btn-black btn-sm" onClick={() => setIncidentModalOpen(true)}>Crear incidencia</button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{color:'var(--muted)',fontSize:13,textAlign:'center',marginTop:40}}>Selecciona un viaje para abrir el caso de soporte</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Validación + Incidencias */}
+                <div className="dash-grid" style={{marginTop:12}}>
+                  <div className="panel">
+                    <div className="block-head"><h2>Validación y cierre</h2><span className="tag">Reglas de cierre</span></div>
+                    {[
+                      'Evidencia inicial cargada y aprobada',
+                      'Evidencia final cargada y aprobada',
+                      'Checklist del traslado completo',
+                      'Gastos revisados',
+                      'Entrega confirmada',
+                      'Incidencias cerradas o documentadas',
+                    ].map((label, i) => (
+                      <label key={i} style={{display:'flex',alignItems:'center',gap:9,padding:'7px 0',borderBottom:'1px solid var(--line)',fontSize:13,cursor:'pointer'}}>
+                        <input type="checkbox" checked={closureChecks[i]} style={{width:15,height:15,accentColor:'var(--route)'}}
+                          onChange={() => setClosureChecks(prev => prev.map((v,j) => j===i ? !v : v))} />
+                        {label}
+                      </label>
+                    ))}
+                    <div style={{border:'1px solid rgba(180,35,24,.3)',borderRadius:8,background:'rgba(180,35,24,.05)',padding:12,display:'grid',gap:5,marginTop:10}}>
+                      <strong style={{color:'var(--red)',fontSize:13}}>
+                        {closureChecks.every(Boolean) ? '✓ Viaje listo para cerrar' : 'Viaje requiere revisión'}
+                      </strong>
+                      <span style={{color:'var(--muted)',fontSize:12}}>
+                        {closureChecks.every(Boolean)
+                          ? 'Todos los puntos completados. Puedes cerrar el viaje.'
+                          : `Faltan ${closureChecks.filter(v=>!v).length} puntos por completar.`}
+                      </span>
+                      <button className={`btn btn-sm ${closureChecks.every(Boolean) ? 'btn-black' : 'btn-danger'}`}
+                        style={{marginTop:6,width:'100%'}}
+                        onClick={() => showToast(closureChecks.every(Boolean) ? 'Viaje cerrado correctamente' : 'Cierre bloqueado — completa el checklist')}>
+                        {closureChecks.every(Boolean) ? 'Cerrar viaje' : 'Bloquear cierre'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="panel">
+                    <div className="block-head"><h2>Gestión de incidencias</h2><button className="btn btn-black btn-sm" onClick={() => setIncidentModalOpen(true)}>Crear</button></div>
+                    <div className="stack">
+                      {[
+                        {title:'Recibida del conductor', desc:'Flujo entrante desde la app · con viaje, conductor, hora y evidencia asociada.'},
+                        {title:'Clasificación', desc:'Tipo: seguridad, retraso, daño previo, documentación, pago/gasto u otro.'},
+                        {title:'Responsable interno', desc:'Soporte operativo · seguimiento con cliente y conductor.'},
+                        {title:'Estatus', desc:'Nueva → En revisión → Requiere información → En seguimiento → Cerrada.'},
+                      ].map(item => (
+                        <div key={item.title} className="stack-item"><strong>{item.title}</strong><span>{item.desc}</span></div>
+                      ))}
+                    </div>
+                    {/* Tickets reales de Supabase */}
+                    {support.slice(0,3).map(s => (
+                      <div key={s.id} className="stack-item" style={{marginTop:6,borderLeft:`3px solid ${s.urgency==='urgent'?'var(--red)':'var(--route)'}`}}>
+                        <strong style={{fontSize:12}}>{s.urgency==='urgent'?'🔴 Urgente':'⚠ Normal'} · #{s.ticket_id ?? s.id.slice(0,6)}</strong>
+                        <span>{s.content?.slice(0,60)}</span>
+                        {!s.read && <button className="btn btn-black btn-sm" style={{marginTop:5,width:'100%'}} onClick={() => markRead(s.id,'support_messages')}>Marcar leído</button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comunicación + App conductor */}
+                <div className="dash-grid" style={{marginTop:12}}>
+                  <div className="panel">
+                    <div className="block-head"><h2>Comunicación</h2><span className="tag">Beta preparada</span></div>
+                    <div style={{display:'grid',gap:8,marginBottom:12}}>
+                      {/* Mensajes reales de Supabase */}
+                      {messages.slice(0,3).map(m => (
+                        <div key={m.id} style={{border:'1px solid var(--line)',borderRadius:8,padding:10,borderLeft:`3px solid var(--route)`,fontSize:13}}>
+                          <strong style={{fontSize:12,fontWeight:800,display:'block'}}>{m.message_type ?? 'Sistema'}</strong>
+                          <span>{m.body}</span>
+                          <small style={{display:'block',color:'var(--muted)',fontSize:11,marginTop:3}}>{timeAgo(m.created_at)}</small>
+                        </div>
+                      ))}
+                      {/* Burbujas demo si no hay mensajes */}
+                      {messages.length === 0 && <>
+                        <div style={{border:'1px solid var(--line)',borderRadius:8,padding:10,borderLeft:'3px solid var(--route)',fontSize:13}}>
+                          <strong style={{fontSize:12,fontWeight:800,display:'block'}}>Conductor</strong>
+                          <span>Llegué al origen, el contacto no responde.</span>
+                          <small style={{display:'block',color:'var(--muted)',fontSize:11,marginTop:3}}>10:52</small>
+                        </div>
+                        <div style={{border:'1px solid var(--line)',borderRadius:8,padding:10,borderLeft:'3px solid var(--blue)',fontSize:13}}>
+                          <strong style={{fontSize:12,fontWeight:800,display:'block'}}>Soporte</strong>
+                          <span>Estamos llamando al cliente. Mantente en punto seguro.</span>
+                          <small style={{display:'block',color:'var(--muted)',fontSize:11,marginTop:3}}>10:53</small>
+                        </div>
+                      </>}
+                    </div>
+                    <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+                      {['Responder conductor','Responder cliente','Nota interna'].map(a => (
+                        <button key={a} style={{minHeight:30,border:'1px solid var(--line)',borderRadius:7,background:'#fff',padding:'0 10px',fontWeight:900,fontSize:11}} onClick={() => showToast(`${a} — próximamente`)}>{a}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="panel">
+                    <div className="block-head"><h2>Botones en app conductor</h2><span className="tag">Preparado</span></div>
+                    <div style={{border:'1px solid var(--line)',borderRadius:12,padding:14,background:'#fafaf8',display:'grid',gap:8}}>
+                      <div style={{fontWeight:900,fontSize:13,textAlign:'center',paddingBottom:8,borderBottom:'1px solid var(--line)'}}>
+                        Viaje activo · {selectedSupportTrip?.id.slice(0,8) ?? 'RR-XXXXXX'}
+                      </div>
+                      <div style={{textAlign:'center',fontSize:11,color:'var(--steel)'}}>
+                        {selectedSupportTrip ? `${selectedSupportTrip.pickup_location?.slice(0,20)} → ${selectedSupportTrip.dropoff_location?.slice(0,20)}` : 'Selecciona un viaje'}
+                      </div>
+                      <button className="btn btn-yellow" style={{width:'100%'}} onClick={() => showToast('Contactando soporte operativo...')}>Contactar soporte operativo</button>
+                      <button className="btn btn-black" style={{width:'100%',marginTop:2}} onClick={() => setIncidentModalOpen(true)}>Reportar incidente</button>
+                      <small style={{color:'var(--muted)',fontSize:10,marginTop:4,textAlign:'center',lineHeight:1.4}}>El incidente entra al panel de soporte con viaje, conductor, hora y evidencia asociada.</small>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Checklist, gastos y eventos */}
+                <div className="dash-grid" style={{marginTop:12}}>
+                  <div className="panel">
+                    <div className="block-head"><h2>Checklist, gastos y reportes</h2><span className="tag">Trazabilidad</span></div>
+                    <div style={{display:'grid',gap:7}}>
+                      {[
+                        {title:'Checklist', desc:'Exterior, interior, placas, tablero, combustible, kilometraje, firmas.', action:'Marcar completo'},
+                        {title:'Reportes del conductor', desc:'Notas, pausas, contacto no disponible, ruta alterna, espera.', action:'Agregar comentario'},
+                        {title:'Gastos reportados', desc:`Total gastos: ${fmt(totalGastos)} · ${expenses.filter(e=>!e.deductible).length} requieren comprobante.`, action:'Requiere aclaración'},
+                        {title:'Historial de eventos', desc:`${trips.length} viajes registrados · bitácora de estados y cambios.`, action:'Ver bitácora'},
+                      ].map(item => (
+                        <div key={item.title} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:10,border:'1px solid var(--line)',borderRadius:8,padding:10}}>
+                          <div>
+                            <strong style={{display:'block',fontSize:13}}>{item.title}</strong>
+                            <span style={{display:'block',fontSize:12,color:'var(--muted)',marginTop:2}}>{item.desc}</span>
+                          </div>
+                          <button className="btn btn-black btn-sm" style={{whiteSpace:'nowrap'}} onClick={() => showToast(`${item.action} — próximamente`)}>{item.action}</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="panel">
+                    <div className="block-head"><h2>Eventos recientes</h2><span className="pill pill-live">● Registro vivo</span></div>
+                    <ol className="timeline">
+                      {trips.slice(0,5).map(t => (
+                        <li key={t.id}><span /><div>
+                          <strong>{STATUS_LABELS[t.status]?.label ?? t.status} — {t.vehicle_brand} {t.vehicle_model}</strong>
+                          <small>{t.driver_email?.split('@')[0] ?? '—'} · {timeAgo(t.created_at)}</small>
+                        </div></li>
+                      ))}
+                      {support.slice(0,3).map(s => (
+                        <li key={s.id}><span /><div>
+                          <strong>Ticket {s.urgency==='urgent'?'urgente':'normal'} · {s.driver_email?.split('@')[0]}</strong>
+                          <small>{timeAgo(s.created_at)}</small>
+                        </div></li>
+                      ))}
+                      {trips.length === 0 && <li><span /><div><strong>Sin eventos registrados</strong><small>La bitácora aparecerá aquí</small></div></li>}
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
               {/* ── VIAJES ──────────────────────────────────────────── */}
               <div className={`section ${section === 'viajes' ? 'active' : ''}`}>
                 <div className="tabs">
@@ -895,6 +1150,83 @@ export default function AdminDashboard() {
             </>
           )}
         </main>
+      </div>
+
+      {/* ── MODAL INCIDENCIA ────────────────────────────────────────────── */}
+      <div className={`modal-overlay ${incidentModalOpen ? 'open' : ''}`} onClick={e => { if(e.target===e.currentTarget) setIncidentModalOpen(false); }}>
+        <div className="modal-box">
+          <div className="modal-head">
+            <div><span className="eyebrow">Flujo de soporte</span><h2>Crear incidencia operativa</h2></div>
+            <button className="icon-btn" onClick={() => setIncidentModalOpen(false)}>×</button>
+          </div>
+          <div className="form-grid">
+            <label>Viaje relacionado
+              <select value={newIncident.trip_ref} onChange={e => setNewIncident(p=>({...p,trip_ref:e.target.value}))}>
+                <option value="">Seleccionar viaje...</option>
+                {trips.slice(0,20).map(t => <option key={t.id} value={t.id}>{t.id.slice(0,8)} · {t.pickup_location?.slice(0,20)} → {t.dropoff_location?.slice(0,18)}</option>)}
+              </select>
+            </label>
+            <label>Origen del caso
+              <select value={newIncident.origin} onChange={e => setNewIncident(p=>({...p,origin:e.target.value}))}>
+                <option value="conductor">Conductor</option>
+                <option value="cliente">Cliente</option>
+                <option value="soporte_interno">Soporte interno</option>
+              </select>
+            </label>
+            <label>Tipo de incidencia
+              <select value={newIncident.type} onChange={e => setNewIncident(p=>({...p,type:e.target.value}))}>
+                <option value="dano_previo">Daño previo</option>
+                <option value="accidente">Accidente</option>
+                <option value="retraso">Retraso</option>
+                <option value="contacto_no_responde">Contacto no responde</option>
+                <option value="falla_mecanica">Falla mecánica</option>
+                <option value="documentacion">Documentación</option>
+                <option value="pago_gasto">Pago/gasto</option>
+                <option value="seguridad">Seguridad</option>
+                <option value="otro">Otro</option>
+              </select>
+            </label>
+            <label>Prioridad
+              <select value={newIncident.priority} onChange={e => setNewIncident(p=>({...p,priority:e.target.value}))}>
+                <option value="baja">Baja</option>
+                <option value="media">Media</option>
+                <option value="alta">Alta</option>
+                <option value="critica">Crítica</option>
+              </select>
+            </label>
+            <label>Responsable interno<input value={newIncident.responsible} onChange={e => setNewIncident(p=>({...p,responsible:e.target.value}))} /></label>
+            <label>Estatus inicial
+              <select value={newIncident.status} onChange={e => setNewIncident(p=>({...p,status:e.target.value}))}>
+                <option value="nueva">Nueva</option>
+                <option value="en_revision">En revisión</option>
+                <option value="requiere_informacion">Requiere información</option>
+                <option value="en_seguimiento">En seguimiento</option>
+                <option value="cerrada">Cerrada</option>
+              </select>
+            </label>
+            <label className="form-wide">Comentarios
+              <textarea placeholder="Describe lo ocurrido, acuerdos, llamadas, evidencia pendiente y siguiente acción" value={newIncident.notes} onChange={e => setNewIncident(p=>({...p,notes:e.target.value}))} />
+            </label>
+          </div>
+          <div className="modal-footer">
+            <button onClick={() => setIncidentModalOpen(false)}>Cancelar</button>
+            <button className="btn btn-black" onClick={async () => {
+              const { error } = await supabase.from('support_messages').insert([{
+                ticket_id: `INC-${Date.now().toString().slice(-4)}`,
+                content: `[${newIncident.type.toUpperCase()}] ${newIncident.notes}`,
+                urgency: newIncident.priority === 'critica' || newIncident.priority === 'alta' ? 'urgent' : 'normal',
+                role: 'admin',
+                read: false,
+                driver_email: trips.find(t=>t.id===newIncident.trip_ref)?.driver_email,
+              }]);
+              if (error) { showToast('Error al crear incidencia'); return; }
+              showToast('Incidencia enviada a soporte');
+              setIncidentModalOpen(false);
+              setNewIncident({ trip_ref: '', origin: 'conductor', type: 'retraso', priority: 'media', responsible: 'Soporte operativo', status: 'nueva', notes: '' });
+              fetchAll();
+            }}>Enviar a soporte</button>
+          </div>
+        </div>
       </div>
 
       {/* ── MODAL NUEVO VIAJE ─────────────────────────────────────────── */}
