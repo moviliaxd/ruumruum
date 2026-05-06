@@ -60,10 +60,10 @@ export default function LandingPage() {
   const [formStatus, setFormStatus] = useState<FormStatus>({});
 
   useEffect(() => {
-    document.title = "MoviliaX Ruum Ruum | Traslado vehicular certificado";
+    document.title = "MoviliaX Ruum-Ruum | Traslado vehicular certificado";
 
     const description =
-      "Ruum Ruum profesionaliza el traslado vehicular con conductores certificados, monitoreo GPS, inspección digital y evidencia antes y después.";
+      "Ruum-Ruum profesionaliza el traslado vehicular con conductores certificados, monitoreo GPS, inspección digital y evidencia antes y después.";
     let metaDescription = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (!metaDescription) {
       metaDescription = document.createElement("meta");
@@ -162,8 +162,8 @@ export default function LandingPage() {
   return (
     <>
       <header className={`site-header${isScrolled ? " is-scrolled" : ""}${isNavOpen ? " is-open" : ""}`}>
-        <a className="brand" href="#inicio" aria-label="MoviliaX Ruum Ruum" onClick={closeNav}>
-          <img src="/Logo_Ruum_horizontal.png" alt="MoviliaX Ruum Ruum" />
+        <a className="brand" href="#inicio" aria-label="MoviliaX Ruum-Ruum" onClick={closeNav}>
+          <img src="/Logo_Ruum_horizontal.png" alt="MoviliaX Ruum-Ruum" />
         </a>
         <button
           className="nav-toggle"
@@ -208,9 +208,9 @@ export default function LandingPage() {
             <div className="hero-actions" aria-label="Acciones principales">
               <a className="button button-primary" href="#descarga">
                 <AppDownloadIcon />
-                Descargar Ruum Ruum
+                Descargar Ruum-Ruum
               </a>
-              <a className="button button-ghost" href="#conductores">
+              <a className="button button-ghost" href="https://ruum-drive-pro.base44.app">
                 <DriverIcon />
                 Registrarme como conductor
               </a>
@@ -339,8 +339,8 @@ export default function LandingPage() {
             </article>
           </div>
           <div className="center-action reveal">
-            <a className="button button-primary" href="#descarga">
-              Probar Ruum Ruum gratis
+            <a className="button button-primary" href="https://ruum-ruum-usuario.base44.app/">
+              Probar Ruum-Ruum gratis
             </a>
           </div>
         </section>
