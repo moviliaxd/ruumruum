@@ -3,11 +3,6 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { uploadFile } from '@/lib/supabase';
-import {
-  CheckCircle2, Navigation, MapPin, Car, Truck, Flag,
-  Phone, ExternalLink, Loader2, Plus, X,
-  Camera, Gauge, Fuel, Key, FileText, ChevronRight
-} from 'lucide-react';
 
 const FLOW_STEPS = [
   { status: 'accepted',       nextStatus: 'in_progress',    cta: 'En camino a recogida',  icon: '🧭' },

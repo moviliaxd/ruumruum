@@ -1,8 +1,17 @@
 'use client';
 import { useAuth } from '@/src/lib/AuthContext';
 import Link from 'next/link';
+import RoleGate from '@/src/components/RoleGate';
 
 export default function ConductorPage() {
+  return (
+    <RoleGate allowed={['conductor']}>
+      <ConductorHome />
+    </RoleGate>
+  );
+}
+
+function ConductorHome() {
   const { profile, loading, signOut } = useAuth();
 
   if (loading) return (

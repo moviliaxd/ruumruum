@@ -7,12 +7,21 @@ import { useAuth } from '@/src/lib/AuthContext';
 import TripCard from '@/src/components/trips/TripCard';
 import WeekCalendar from '@/src/components/trips/WeekCalendar';
 import TripFlowManager from '@/src/components/trips/TripFlowManager';
+import RoleGate from '@/src/components/RoleGate';
 
 const ACTIVE_STATUSES = ['accepted', 'in_progress', 'pickup_arrived', 'vehicle_picked', 'delivering'];
 
 type TabKey = 'solicitados' | 'aceptados' | 'calendario';
 
 export default function ViajesPage() {
+  return (
+    <RoleGate allowed={['conductor']}>
+      <ViajesContent />
+    </RoleGate>
+  );
+}
+
+function ViajesContent() {
   const { profile } = useAuth();
   const [trips, setTrips]           = useState<Trip[]>([]);
   const [loading, setLoading]       = useState(true);

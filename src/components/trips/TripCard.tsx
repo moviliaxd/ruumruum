@@ -26,7 +26,7 @@ interface Props {
   index?: number;
 }
 
-export default function TripCard({ trip, onClick, index = 0 }: Props) {
+export default function TripCard({ trip, onClick }: Props) {
   const status = STATUS_CONFIG[trip.status] ?? STATUS_CONFIG.requested;
 
   return (

@@ -211,6 +211,30 @@ alter table driver_documents  enable row level security;
 alter table messages          enable row level security;
 alter table support_messages  enable row level security;
 
+-- ============================================================
+-- STORAGE — bucket usado por documentos, comprobantes y evidencia
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('ruum-files', 'ruum-files', true);
+
+create policy "ruum_files_authenticated_upload"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'ruum-files'
+    and auth.role() = 'authenticated'
+  );
+
+create policy "ruum_files_authenticated_update"
+  on storage.objects for update
+  using (
+    bucket_id = 'ruum-files'
+    and auth.role() = 'authenticated'
+  );
+
+create policy "ruum_files_authenticated_read"
+  on storage.objects for select
+  using (bucket_id = 'ruum-files');
+
 -- Profiles: cada quien ve y edita solo el suyo; admin ve todos
 create policy "profiles_select_own"   on profiles for select using (auth.uid() = id);
 create policy "profiles_update_own"   on profiles for update using (auth.uid() = id);

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/src/lib/AuthContext';
 import { supabase, Trip } from '@/lib/supabase';
+import RoleGate from '@/src/components/RoleGate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -177,12 +178,11 @@ function TripProgress({ status }: { status: string }) {
 // ─── Pantallas ────────────────────────────────────────────────────────────────
 
 function HomeScreen({
-  profile, trips, onSolicitar, onVerViajes, onDetalleViaje
+  profile, trips, onSolicitar, onDetalleViaje
 }: {
   profile: { full_name?: string; email: string };
   trips: Trip[];
   onSolicitar: () => void;
-  onVerViajes: () => void;
   onDetalleViaje: (t: Trip) => void;
 }) {
   const activos = trips.filter(t => !['completed', 'cancelled'].includes(t.status));
@@ -782,15 +782,21 @@ function PerfilScreen({ profile, onSignOut }: { profile: { full_name?: string; e
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function ClientePage() {
+  return (
+    <RoleGate allowed={['cliente']}>
+      <ClienteContent />
+    </RoleGate>
+  );
+}
+
+function ClienteContent() {
   const { profile, loading, signOut } = useAuth();
   const [screen, setScreen]           = useState<Screen>('home');
   const [trips, setTrips]             = useState<Trip[]>([]);
-  const [tripsLoading, setTripsLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 
   const fetchTrips = useCallback(async () => {
     if (!profile) return;
-    setTripsLoading(true);
     const { data } = await supabase
       .from('trips')
       .select('*')
@@ -798,7 +804,6 @@ export default function ClientePage() {
       .order('created_at', { ascending: false })
       .limit(100);
     setTrips((data as Trip[]) ?? []);
-    setTripsLoading(false);
   }, [profile]);
 
   useEffect(() => { fetchTrips(); }, [fetchTrips]);
@@ -857,7 +862,6 @@ export default function ClientePage() {
           profile={profile}
           trips={trips}
           onSolicitar={() => setScreen('solicitar')}
-          onVerViajes={() => setScreen('mis-viajes')}
           onDetalleViaje={handleDetalleViaje}
         />
       )}

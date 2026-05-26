@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { Trip, Expense, DriverDocument, Message, Profile } from '@/lib/supabase';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase, Trip, Expense, DriverDocument, Message, Profile } from '@/lib/supabase';
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 interface SupportMessage {
@@ -104,6 +98,7 @@ export default function AdminDashboard() {
   const [toast, setToast]     = useState({ msg: '', show: false });
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [selectedSupportTrip, setSelectedSupportTrip] = useState<Trip | null>(null);
+  const [selectedDriverEmail, setSelectedDriverEmail] = useState('');
   const [incidentModalOpen, setIncidentModalOpen] = useState(false);
   const [closureChecks, setClosureChecks] = useState([true, false, true, false, true, false]);
   const [newIncident, setNewIncident] = useState({ trip_ref: "", origin: "conductor", type: "retraso", priority: "media", responsible: "Soporte operativo", status: "nueva", notes: "" });
@@ -151,6 +146,10 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    setSelectedDriverEmail(selectedTrip?.driver_email ?? '');
+  }, [selectedTrip?.id, selectedTrip?.driver_email]);
 
   // ── Tiempo real ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -204,6 +203,38 @@ export default function AdminDashboard() {
     if (error) { showToast('Error al guardar viaje'); return; }
     showToast('Viaje creado correctamente');
     setModalOpen(false);
+    fetchAll();
+  }
+
+  async function assignDriver() {
+    if (!selectedTrip || !selectedDriverEmail) {
+      showToast('Selecciona un conductor');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('trips')
+      .update({
+        driver_email: selectedDriverEmail,
+        status: selectedTrip.status === 'requested' ? 'accepted' : selectedTrip.status,
+      })
+      .eq('id', selectedTrip.id);
+
+    if (error) {
+      showToast('Error al asignar conductor');
+      return;
+    }
+
+    const driver = profiles.find(p => p.email === selectedDriverEmail);
+    const updatedTrip = {
+      ...selectedTrip,
+      driver_email: selectedDriverEmail,
+      status: selectedTrip.status === 'requested' ? 'accepted' : selectedTrip.status,
+    } as Trip;
+
+    setSelectedTrip(updatedTrip);
+    setTrips(prev => prev.map(t => t.id === selectedTrip.id ? updatedTrip : t));
+    showToast(`Conductor asignado${driver?.full_name ? `: ${driver.full_name}` : ''}`);
     fetchAll();
   }
 
@@ -791,7 +822,20 @@ export default function AdminDashboard() {
                           <div><span>Ganancia</span><strong>{selectedTrip.earnings ? fmt(selectedTrip.earnings) : '—'}</strong></div>
                         </div>
                         <div className="action-grid">
-                          <button className="btn btn-black btn-sm" onClick={() => showToast('Asignar conductor — próximamente')}>Asignar conductor</button>
+                          <select
+                            className="btn-sm"
+                            value={selectedDriverEmail}
+                            onChange={e => setSelectedDriverEmail(e.target.value)}
+                            style={{ minHeight: 30, border: '1px solid var(--line)', borderRadius: 8, padding: '0 10px', background: '#fff' }}
+                          >
+                            <option value="">Seleccionar conductor</option>
+                            {conductores.map(c => (
+                              <option key={c.id} value={c.email}>
+                                {c.full_name || c.email}
+                              </option>
+                            ))}
+                          </select>
+                          <button className="btn btn-black btn-sm" onClick={assignDriver}>Asignar conductor</button>
                           <button className="btn btn-black btn-sm" onClick={() => showToast('Editar horario — próximamente')}>Editar horario</button>
                           <button className="btn btn-black btn-sm" onClick={() => setSection('evidencia')}>Ver evidencia</button>
                           <button className="btn btn-black btn-sm" onClick={() => showToast('Incidencia registrada')}>Registrar incidencia</button>
